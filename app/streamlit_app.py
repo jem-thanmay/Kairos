@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.features import extract_features
 from src.predictor import predict
 from src.ollama_guide import generate_guidance, test_ollama_connection
+from src.tracker import save_observation, get_trajectory, list_people, delete_person
 
 st.set_page_config(
     page_title="Kairos",
@@ -65,9 +66,14 @@ st.markdown("""
         line-height: 1.7;
         padding: 1rem;
     }
-    .stTextArea textarea:focus {
-        border-color: #7A8C84;
-        box-shadow: 0 0 0 2px #E8EDE9;
+    .stTextInput input {
+        font-family: 'Georgia', serif;
+        font-size: 14px;
+        background: #FFFFFF;
+        border: 1px solid #DDE5DF;
+        border-radius: 10px;
+        color: #2C3E35;
+        padding: 0.6rem 1rem;
     }
     .stRadio > div { gap: 0.6rem; }
     .stRadio label {
@@ -101,6 +107,14 @@ st.markdown("""
         border-radius: 12px;
         margin: 1rem 0;
         line-height: 1.7;
+    }
+    .trajectory-card {
+        padding: 1.2rem 1.4rem;
+        border-radius: 12px;
+        margin: 1rem 0;
+        line-height: 1.8;
+        border: 1px solid #E8EDE9;
+        background: #FFFFFF;
     }
     .guidance-card {
         background: #F4F7F5;
@@ -223,6 +237,33 @@ input_type = "observer" if mode == "Someone I care about" else "first_person"
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# Person identifier
+if input_type == "observer":
+    st.markdown('<div class="section-label">Who is this about?</div>',
+        unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:12px; color:#9AAB9F; margin-bottom:8px;">'
+        'Use a nickname or label — this is stored only on your device.</div>',
+        unsafe_allow_html=True)
+    person_id = st.text_input(
+        label="person",
+        placeholder="e.g. mom, best friend, colleague",
+        label_visibility="collapsed"
+    )
+
+    # Show existing people
+    existing = list_people('observer')
+    if existing:
+        names = [p['person_id'] for p in existing]
+        st.markdown(
+            '<div style="font-size:12px; color:#9AAB9F; margin-top:4px;">Previously tracked: ' +
+            ', '.join(names) + '</div>',
+            unsafe_allow_html=True)
+else:
+    person_id = "self"
+
+st.markdown("<br>", unsafe_allow_html=True)
+
 # Input
 if input_type == "observer":
     st.markdown('<div class="section-label">What have you noticed?</div>',
@@ -231,17 +272,14 @@ if input_type == "observer":
         "Describe what you have observed in plain language. "
         "No need for clinical terms — just what you have seen or heard. "
         "For example: She has not been eating properly. "
-        "She laughed it off but sounded really flat. "
-        "She keeps saying she is fine but I can hear how exhausted she is."
+        "She laughed it off but sounded really flat."
     )
 else:
     st.markdown('<div class="section-label">How have you been feeling?</div>',
         unsafe_allow_html=True)
     placeholder = (
         "There is no right or wrong way to write this. "
-        "Just say what is true for you right now. "
-        "For example: I do not see the point anymore. "
-        "I am exhausted and nothing I do seems to matter."
+        "Just say what is true for you right now."
     )
 
 text_input = st.text_area(
@@ -282,6 +320,8 @@ analyse = st.button("Read the patterns", use_container_width=True)
 if analyse:
     if not text_input.strip():
         st.warning("Please write something before continuing.")
+    elif input_type == "observer" and not person_id.strip():
+        st.warning("Please enter a name or label for this person.")
     elif input_type == "observer" and relationship == "Select...":
         st.warning("Please select your relationship to this person.")
     else:
@@ -293,6 +333,20 @@ if analyse:
         confidence = result['confidence']
         probs = result['probabilities']
         static_guidance = result['guidance']
+
+        # Save observation
+        save_observation(
+            person_id=person_id.strip(),
+            text=text_input,
+            stage=stage,
+            confidence=confidence,
+            probabilities=probs,
+            relationship=relationship,
+            input_type=input_type
+        )
+
+        # Get trajectory
+        trajectory = get_trajectory(person_id.strip())
 
         st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
 
@@ -329,12 +383,78 @@ if analyse:
         with col3:
             st.metric("Crisis", f"{probs.get('crisis', 0)*100:.0f}%")
 
+        # Trajectory section
+        if trajectory['has_trajectory']:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<div class="section-label">Trajectory</div>',
+                unsafe_allow_html=True)
+
+            trend = trajectory['trend']
+            trend_color = trajectory['trend_color']
+            n = trajectory['total_observations']
+            stages = trajectory['recent_stages']
+
+            trend_icons = {
+                'worsening': '↗',
+                'improving': '↘',
+                'stable': '→'
+            }
+            trend_labels = {
+                'worsening': 'Signal is intensifying',
+                'improving': 'Signal is easing',
+                'stable': 'Signal is holding steady'
+            }
+
+            stage_arrow = ' → '.join(stages)
+
+            st.markdown(f"""
+            <div class="trajectory-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-size:13px; font-weight:600; color:{trend_color};">
+                            {trend_icons[trend]} {trend_labels[trend]}
+                        </span>
+                        <div style="font-size:12px; color:#7A8C84; margin-top:4px;">
+                            Based on {n} observation{'s' if n > 1 else ''}
+                        </div>
+                    </div>
+                    <div style="font-size:12px; color:#9AAB9F; text-align:right;">
+                        {stage_arrow}
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Stage change alert
+            if trajectory['stage_changed']:
+                prev = trajectory['previous_stage']
+                curr = trajectory['current_stage']
+                stage_order = ['stress', 'depression', 'crisis']
+                if stage_order.index(curr) > stage_order.index(prev):
+                    st.markdown(f"""
+                    <div style="background:#FDF4F4; border-left:3px solid #C97A7A;
+                         padding:0.8rem 1.2rem; border-radius:0 8px 8px 0;
+                         font-size:13px; color:#6B1E1E; margin-bottom:1rem;">
+                        The pattern has shifted from <strong>{prev}</strong> to
+                        <strong>{curr}</strong> since your last observation.
+                        This change in trajectory is worth paying attention to.
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background:#F0F7F4; border-left:3px solid #7AB89A;
+                         padding:0.8rem 1.2rem; border-radius:0 8px 8px 0;
+                         font-size:13px; color:#1E6B3E; margin-bottom:1rem;">
+                        The pattern has shifted from <strong>{prev}</strong> to
+                        <strong>{curr}</strong> since your last observation.
+                        This is a positive sign.
+                    </div>
+                    """, unsafe_allow_html=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
 
-        # Ollama guidance
-        ollama_available = test_ollama_connection()
-
+        # Guidance
         if input_type == 'observer':
             if relationship and relationship != "Select...":
                 st.markdown(
@@ -348,6 +468,8 @@ if analyse:
                 unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
+
+        ollama_available = test_ollama_connection()
 
         if ollama_available:
             with st.spinner("Generating personalised guidance..."):
@@ -384,9 +506,7 @@ if analyse:
                 st.markdown(
                     f'<div class="avoid-card">{ollama_result["what_not_to_do"]}</div>',
                     unsafe_allow_html=True)
-
             else:
-                # Fallback to static
                 st.markdown("**What tends to help**")
                 st.markdown(
                     f'<div class="guidance-card">{static_guidance["what_to_say"]}</div>',
@@ -397,7 +517,6 @@ if analyse:
                     f'<div class="avoid-card">{static_guidance["what_not_to_do"]}</div>',
                     unsafe_allow_html=True)
         else:
-            # Ollama not running — use static
             st.markdown("**What tends to help**")
             st.markdown(
                 f'<div class="guidance-card">{static_guidance["what_to_say"]}</div>',
@@ -423,8 +542,7 @@ if analyse:
                 crisis_body = (
                     "What you are feeling is real and it is serious. "
                     "Please consider reaching out to someone — a person you trust, "
-                    "or a crisis line where someone will listen without judgment. "
-                    "You reached out here. That same instinct can take you one step further."
+                    "or a crisis line where someone will listen without judgment."
                 )
 
             st.markdown(f"""
