@@ -53,6 +53,19 @@
         "stress": 0.144
       },
       "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-08T23:24:05.152471",
+      "date": "June 08, 2026",
+      "text": "she finds it hard to get along through the day because she's worried about what will happen in the future, she doesnt know if her efforts will pay off or not. so she doesn't really want to play anything or do anything at all. ",
+      "stage": "crisis",
+      "confidence": 0.5,
+      "probabilities": {
+        "crisis": 0.5,
+        "depression": 0.296,
+        "stress": 0.203
+      },
+      "input_type": "observer"
     }
   ]
 }
