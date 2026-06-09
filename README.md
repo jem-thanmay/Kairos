@@ -2,6 +2,8 @@
 
 > *From the Greek — "the opportune moment." The right time to reach out, say the right thing, or simply be present.*
 
+![Kairos Demo](assets/demo.gif)
+
 Kairos is a private, culturally-aware early warning system that helps people support someone they love who is silently burning out — without that person ever needing to ask for help.
 
 ---
@@ -27,6 +29,19 @@ It has two users:
 
 ---
 
+## What Makes Kairos Different
+
+| | Kairos | ChatGPT / Generic LLM |
+|---|---|---|
+| Trained cascade model | Yes — 240K posts, 0.924 AUC | No |
+| Observer vs first-person mode | Yes | No |
+| Longitudinal memory | Yes — tracks trajectory over time | No — resets every conversation |
+| Fully local, zero data sent out | Yes — runs on your machine | No |
+| Relationship-aware guidance | Yes — tailored per relationship type | No |
+| Cultural sensitivity | Yes — built for non-Western contexts | Generic |
+
+---
+
 ## What Kairos Does
 
 1. **Tracks** — The observer logs simple observations in plain language. NLP maps them to the cascade over time.
@@ -37,7 +52,7 @@ It has two users:
 
 ## Model Performance
 
-Trained on 240,448 Reddit posts across three cascade stages (stress, depression, crisis) with observer-perspective augmentation.
+Trained on 240,448 Reddit posts across three cascade stages with observer-perspective augmentation.
 
 | Stage | Precision | Recall | F1 |
 |---|---|---|---|
@@ -48,17 +63,15 @@ Trained on 240,448 Reddit posts across three cascade stages (stress, depression,
 
 **AUC: 0.924**
 
-The model distinguishes between observer-perspective descriptions ("she stopped eating") and first-person expressions ("I don't see the point anymore") — applying stage-appropriate dampening for third-person behavioral signals.
-
 ---
 
 ## Tech Stack
 
 | Layer | Tools |
 |---|---|
-| NLP & Features | VADER Sentiment, NLTK, custom psycholinguistic word lists |
+| NLP and Features | VADER Sentiment, NLTK, custom psycholinguistic word lists |
 | Classifier | XGBoost, scikit-learn, SHAP |
-| LLM Guidance | Llama 3.2 via Ollama (fully local) |
+| LLM Guidance | Mistral 7B via Ollama — fully local |
 | API | FastAPI |
 | Frontend | Streamlit |
 | Privacy | 100% local — no data leaves your device |
@@ -67,26 +80,13 @@ The model distinguishes between observer-perspective descriptions ("she stopped 
 
 ## Ethical Guardrails
 
-- **Never diagnoses** — uses "signal" and "pattern", never "condition" or "disorder"
-- **Always redirects** — every insight points toward professional support
-- **Consent-first** — the subject must know the app exists
-- **Honest uncertainty** — says "I don't know" when signals are ambiguous
-- **Crisis protocol** — hardcoded escalation when signals cross a threshold
+- Never diagnoses — uses signal and pattern language only
+- Always redirects to professionals when signals are serious
+- Consent-first — subject must know the app exists
+- Honest uncertainty — says I don't know when signals are ambiguous
+- Crisis protocol — hardcoded escalation with US and India crisis resources
 
 See [ETHICS.md](ETHICS.md) for full detail.
-
----
-
-## Project Status
-
-- [x] Data pipeline — 240K posts unified across 3 cascade stages
-- [x] Feature extraction — 14 psycholinguistic + 2 behavioral features
-- [x] Cascade classifier — XGBoost, 80% accuracy, 0.924 AUC
-- [x] Observer vs first-person input handling
-- [ ] Streamlit frontend
-- [ ] FastAPI backend
-- [ ] Ollama conversational layer
-- [ ] Longitudinal tracking across sessions
 
 ---
 
@@ -100,15 +100,34 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Install Ollama (ollama.com) then:
-ollama pull llama3.2
+# Install Ollama from https://ollama.com then:
+ollama pull mistral
+
+# Run
+bash run.sh
 ```
+
+---
+
+## Project Status
+
+- [x] Data pipeline — 240K posts unified across 3 cascade stages
+- [x] Feature extraction — 14 psycholinguistic and 2 behavioral features
+- [x] Cascade classifier — XGBoost, 80% accuracy, 0.924 AUC
+- [x] Observer vs first-person input handling
+- [x] Mistral-powered dynamic relationship-aware guidance
+- [x] Streamlit frontend
+- [ ] Longitudinal tracking across sessions
+- [ ] Conversational layer for subject engagement
 
 ---
 
 ## Disclaimer
 
-Kairos is a research and portfolio project. It is not a clinical tool and does not replace professional mental health care. If you or someone you know is in crisis, please contact a mental health professional or crisis line.
+Kairos is a research and portfolio project. It is not a clinical tool and does not replace professional mental health care. If you or someone you know is in crisis, please contact a mental health professional or a crisis line.
+
+**USA — 988 Suicide and Crisis Lifeline:** Call or text 988 (24/7)
+**India — iCall:** 9152987821
 
 ---
 
