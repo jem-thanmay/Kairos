@@ -40,6 +40,19 @@
         "stress": 0.433
       },
       "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-08T23:07:57.470670",
+      "date": "June 08, 2026",
+      "text": "she's better but i want to make her feel even better what do i do. she is still having a bad relationship with food and eats her emotions and cries everyday saying she doesnt know whats happening to her.",
+      "stage": "crisis",
+      "confidence": 0.629,
+      "probabilities": {
+        "crisis": 0.629,
+        "depression": 0.227,
+        "stress": 0.144
+      },
+      "input_type": "observer"
     }
   ]
 }

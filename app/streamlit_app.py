@@ -9,8 +9,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.features import extract_features
 from src.predictor import predict
 from src.ollama_guide import generate_guidance, test_ollama_connection
-from src.tracker import save_observation, get_trajectory, list_people
+from src.tracker import save_observation, get_trajectory, list_people, load_history, delete_person
 from src.conversation import get_response, get_opening_message, check_crisis_signal
+from src.explainer import get_shap_explanation, plot_shap_bar
 
 st.set_page_config(
     page_title="Kairos",
@@ -261,7 +262,7 @@ if 'chat_stage' not in st.session_state:
 if 'talk_input_key' not in st.session_state:
     st.session_state.talk_input_key = 0
 
-tab1, tab2 = st.tabs(["Observe", "Talk"])
+tab1, tab2, tab3 = st.tabs(["Observe", "Talk", "History"])
 
 # ─────────────────────────────────────────
 # TAB 1 — OBSERVE
@@ -417,6 +418,36 @@ with tab1:
                 st.metric("Depression", f"{probs.get('depression', 0)*100:.0f}%")
             with col3:
                 st.metric("Crisis", f"{probs.get('crisis', 0)*100:.0f}%")
+
+            # SHAP explanation
+            with st.expander("Why did Kairos read it this way?"):
+                try:
+                    explanation = get_shap_explanation(features, stage)
+                    img = plot_shap_bar(explanation, stage)
+                    st.markdown(
+                        '<div style="font-size:13px; color:#7A8C84; font-family:Georgia,serif;'
+                        'font-style:italic; margin-bottom:0.8rem; line-height:1.7;">'
+                        'These are the signals that most influenced the prediction. '
+                        'Colored bars pushed toward the detected stage. '
+                        'Grey bars pulled away from it.</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.image(img, use_container_width=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    top3 = explanation["top_features"][:3]
+                    for f in top3:
+                        label = f["label"]
+                        direction = "detected, pushing toward " + stage if f["shap_value"] > 0 else "not strongly present"
+                        st.markdown(
+                            f'<div style="font-size:12px; color:#5C6E65; margin-bottom:4px; font-family:Georgia,serif;">' +
+                            f'· <strong>{label}</strong> — {direction}</div>',
+                            unsafe_allow_html=True
+                        )
+                except Exception as e:
+                    st.markdown(
+                        '<div style="font-size:12px; color:#9AAB9F;">Explanation unavailable.</div>',
+                        unsafe_allow_html=True
+                    )
 
             if trajectory['has_trajectory']:
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -634,6 +665,156 @@ with tab1:
                 st.session_state['followup_counter'] = \
                     st.session_state.get('followup_counter', 0) + 1
                 st.rerun()
+
+    st.markdown("""
+    <div class="kairos-footer">
+        Built with care by
+        <a href="https://jem-thanmay.vercel.app">Thanmay Jembige</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/jem-thanmay/Kairos">GitHub</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────
+# TAB 3 — HISTORY
+# ─────────────────────────────────────────
+with tab3:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:14px; color:#7A8C84; font-family:Georgia,serif;'
+        'font-style:italic; margin-bottom:1.5rem; line-height:1.8;">'
+        'A record of everyone you have been tracking. All data is stored only on your device.'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    stage_colors = {
+        'stress': '#C9A87A',
+        'depression': '#7B72D4',
+        'crisis': '#C97A7A'
+    }
+    stage_icons = {
+        'stress': '🟡',
+        'depression': '🟣',
+        'crisis': '🔴'
+    }
+
+    # Toggle between observer and self history
+    history_mode = st.radio(
+        label="history_mode",
+        options=["People I am tracking", "My own journey"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="history_mode"
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if history_mode == "People I am tracking":
+        people = list_people('observer')
+        if not people:
+            st.markdown(
+                '<div style="font-size:14px; color:#9AAB9F; font-family:Georgia,serif;'
+                'font-style:italic; text-align:center; margin-top:3rem;">'
+                'No observations logged yet. Start in the Observe tab.'
+                '</div>',
+                unsafe_allow_html=True
+            )
+        else:
+            selected_person = st.selectbox(
+                label="Select person",
+                options=[p["person_id"] for p in people],
+                label_visibility="collapsed",
+                key="history_person"
+            )
+    else:
+        # Self history
+        self_history = load_history('self')
+        if not self_history or not self_history.get('observations'):
+            st.markdown(
+                '<div style="font-size:14px; color:#9AAB9F; font-family:Georgia,serif;'
+                'font-style:italic; text-align:center; margin-top:3rem;">'
+                'No personal observations logged yet. Use Myself mode in the Observe tab.'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            selected_person = None
+        else:
+            selected_person = 'self'
+
+    if history_mode == "People I am tracking":
+        show_history = bool(people)
+    else:
+        show_history = selected_person == 'self'
+
+    if show_history and selected_person:
+
+        history = load_history(selected_person)
+        trajectory = get_trajectory(selected_person)
+        obs_list = history.get("observations", [])
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Summary card
+        rel = history.get("relationship", "")
+        display_name = "Your journey" if selected_person == "self" else selected_person.capitalize()
+        st.markdown(
+            f'<div style="font-size:13px; color:#7A8C84; font-family:Georgia,serif;'
+            f'margin-bottom:1rem;">{display_name}'
+            f'{" · " + rel if rel and rel != "Select..." else ""}'
+            f' · {len(obs_list)} observation{"s" if len(obs_list) != 1 else ""}</div>',
+            unsafe_allow_html=True
+        )
+
+        # Trajectory summary
+        if trajectory["has_trajectory"]:
+                trend = trajectory["trend"]
+                trend_color = trajectory["trend_color"]
+                trend_icons = {"worsening": "↗", "improving": "↘", "stable": "→"}
+                trend_labels = {
+                    "worsening": "Signal is intensifying",
+                    "improving": "Signal is easing",
+                    "stable": "Signal is holding steady"
+                }
+                st.markdown(
+                    f'<div style="font-size:13px; font-weight:600; color:{trend_color}; margin-bottom:1.2rem;">' +
+                    f'{trend_icons[trend]} {trend_labels[trend]}</div>',
+                    unsafe_allow_html=True
+                )
+
+        st.markdown('<hr style="border:none; border-top:1px solid #E8EDE9; margin:0.5rem 0 1.2rem 0;">', unsafe_allow_html=True)
+
+        # Observation list — most recent first
+        for obs in reversed(obs_list):
+            stage = obs["stage"]
+            color = stage_colors.get(stage, "#7A8C84")
+            icon = stage_icons.get(stage, "⚪")
+            date = obs.get("date", "")
+            text = obs.get("text", "")
+            probs = obs.get("probabilities", {})
+
+            st.markdown(
+                f'<div style="border-left:3px solid {color}; padding:0.8rem 1.2rem;' +
+                'background:#FFFFFF; border-radius:0 10px 10px 0; margin-bottom:1rem;">' +
+                f'<div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">' +
+                f'<span style="font-size:12px; font-weight:600; color:{color}; text-transform:uppercase; letter-spacing:0.08em;">{icon} {stage}</span>' +
+                f'<span style="font-size:11px; color:#9AAB9F;">{date}</span></div>' +
+                f'<div style="font-size:13px; color:#3D4F46; font-family:Georgia,serif; font-style:italic; line-height:1.7; margin-bottom:0.5rem;">&ldquo;{text[:200]}{"..." if len(text) > 200 else ""}&rdquo;</div>' +
+                f'<div style="font-size:11px; color:#9AAB9F;">' +
+                f'Stress {probs.get("stress",0)*100:.0f}% · ' +
+                f'Depression {probs.get("depression",0)*100:.0f}% · ' +
+                f'Crisis {probs.get("crisis",0)*100:.0f}%</div>' +
+                '</div>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Delete option
+        delete_label = "Delete my personal history" if selected_person == "self" else f"Delete all records for {selected_person}"
+        if st.button(delete_label, key="history_delete"):
+            delete_person(selected_person)
+            st.success("Records deleted.")
+            st.rerun()
 
     st.markdown("""
     <div class="kairos-footer">
