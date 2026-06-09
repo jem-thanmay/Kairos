@@ -1,0 +1,45 @@
+{
+  "person_id": "rock",
+  "relationship": "Other",
+  "observations": [
+    {
+      "timestamp": "2026-06-08T22:48:51.963776",
+      "date": "June 08, 2026",
+      "text": "my friend seems silent and sad what do i do she complains about her relationship and she's terribly stressed out and overeats because of this",
+      "stage": "depression",
+      "confidence": 0.968,
+      "probabilities": {
+        "crisis": 0.027,
+        "depression": 0.968,
+        "stress": 0.005
+      },
+      "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-08T22:53:17.871492",
+      "date": "June 08, 2026",
+      "text": "i spoke about my friend last time and she has not got better",
+      "stage": "depression",
+      "confidence": 0.963,
+      "probabilities": {
+        "crisis": 0.024,
+        "depression": 0.963,
+        "stress": 0.013
+      },
+      "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-08T22:57:02.449003",
+      "date": "June 08, 2026",
+      "text": "she got a little better than last time but still overthinks",
+      "stage": "depression",
+      "confidence": 0.537,
+      "probabilities": {
+        "crisis": 0.029,
+        "depression": 0.537,
+        "stress": 0.433
+      },
+      "input_type": "observer"
+    }
+  ]
+}

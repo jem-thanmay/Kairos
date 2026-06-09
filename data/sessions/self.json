@@ -1,0 +1,19 @@
+{
+  "person_id": "self",
+  "relationship": null,
+  "observations": [
+    {
+      "timestamp": "2026-06-08T22:54:31.098456",
+      "date": "June 08, 2026",
+      "text": "i spoke last time about myself missing the cat i still feel bad that i miss her and guilty now",
+      "stage": "depression",
+      "confidence": 0.936,
+      "probabilities": {
+        "crisis": 0.063,
+        "depression": 0.936,
+        "stress": 0.0
+      },
+      "input_type": "first_person"
+    }
+  ]
+}
