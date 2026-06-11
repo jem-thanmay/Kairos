@@ -10,3 +10,8 @@ data/processed/*
 .env
 *.egg-info/
 .ipynb_checkpoints/
+data/sessions/
+data/raw/
+data/processed/
+models/
+assets/demo_compressed.gif
