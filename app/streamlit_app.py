@@ -253,6 +253,10 @@ if 'obs_context' not in st.session_state:
     st.session_state.obs_context = None
 if 'obs_followup_history' not in st.session_state:
     st.session_state.obs_followup_history = []
+if 'obs_input_key' not in st.session_state:
+    st.session_state.obs_input_key = 0
+if 'last_input_type' not in st.session_state:
+    st.session_state.last_input_type = None
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 if 'chat_started' not in st.session_state:
@@ -281,8 +285,18 @@ with tab1:
     )
     input_type = "observer" if mode == "Someone I care about" else "first_person"
 
+    # Clear obs state when mode switches
+    if st.session_state.get('last_input_type') != input_type:
+        st.session_state.obs_result = None
+        st.session_state.obs_context = None
+        st.session_state.obs_followup_history = []
+        st.session_state['last_input_type'] = input_type
+
     st.markdown("<br>", unsafe_allow_html=True)
 
+    if input_type == "myself_mode":
+        pass  # placeholder
+    
     if input_type == "observer":
         st.markdown('<div class="section-label">Who is this about?</div>',
             unsafe_allow_html=True)
@@ -294,7 +308,7 @@ with tab1:
             label="person",
             placeholder="e.g. mom, best friend, colleague",
             label_visibility="collapsed",
-            key="obs_person"
+            key=f"obs_person_{st.session_state.obs_input_key}"
         )
         existing = list_people('observer')
         if existing:
@@ -308,83 +322,146 @@ with tab1:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if input_type == "observer":
-        st.markdown('<div class="section-label">What have you noticed?</div>',
-            unsafe_allow_html=True)
-        placeholder = (
-            "Describe what you have observed in plain language. "
-            "For example: She has not been eating properly. "
-            "She laughed it off but sounded really flat."
-        )
-    else:
-        st.markdown('<div class="section-label">How have you been feeling?</div>',
-            unsafe_allow_html=True)
-        placeholder = "There is no right or wrong way to write this. Just say what is true for you right now."
+    # ── MYSELF MODE — conversational vent space ──
+    if input_type == "first_person":
+        st.markdown("""
+        <div style="font-size:14px; color:#7A8C84; font-family:Georgia,serif;
+             font-style:italic; margin-bottom:1.2rem; line-height:1.8;">
+        This is your space. Say whatever is on your mind — vent, think out loud,
+        or just describe how you have been feeling. No judgement, no pressure.
+        </div>
+        """, unsafe_allow_html=True)
 
-    text_input = st.text_area(
-        label="input",
-        placeholder=placeholder,
-        height=180,
-        label_visibility="collapsed",
-        key="obs_text"
-    )
+        if 'self_chat_history' not in st.session_state:
+            st.session_state.self_chat_history = []
+        if 'self_input_key' not in st.session_state:
+            st.session_state.self_input_key = 0
+        if 'self_full_text' not in st.session_state:
+            st.session_state.self_full_text = ""
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        # Show conversation so far
+        for turn in st.session_state.self_chat_history:
+            if turn['role'] == 'assistant':
+                st.markdown(
+                    f'<div class="chat-bubble-kairos">{turn["content"]}</div>',
+                    unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    f'<div class="chat-bubble-user">{turn["content"]}</div>',
+                    unsafe_allow_html=True)
 
-    relationship = None
-    if input_type == "observer":
-        st.markdown('<div class="section-label">Your relationship to this person</div>',
-            unsafe_allow_html=True)
-        relationship = st.selectbox(
-            label="relationship",
-            options=["Select...", "Parent", "Child / Adult child",
-                     "Partner / Spouse", "Friend", "Sibling", "Colleague", "Other"],
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Voice text injection
+        if 'self_voice_text' not in st.session_state:
+            st.session_state.self_voice_text = ""
+
+        self_msg = st.text_area(
+            label="self_input",
+            placeholder="Say whatever comes to mind... or press 🎙 to speak",
             label_visibility="collapsed",
-            key="obs_rel"
+            height=100,
+            value=st.session_state.self_voice_text,
+            key=f"self_msg_{st.session_state.self_input_key}"
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    analyse = st.button("Read the patterns", use_container_width=True, key="obs_btn")
+        col1, col2, col3 = st.columns([3, 0.7, 0.7])
+        with col1:
+            self_send = st.button("Send  ↵", use_container_width=True, key="self_send")
+        with col2:
+            self_voice = st.button("🎙", use_container_width=True, key="self_voice")
+        with col3:
+            self_clear = st.button("↺", use_container_width=True, key="self_clear", help="Start over")
 
-    if analyse:
-        if not text_input.strip():
-            st.warning("Please write something before continuing.")
-        elif input_type == "observer" and not person_id.strip():
-            st.warning("Please enter a name or label for this person.")
-        elif input_type == "observer" and relationship == "Select...":
-            st.warning("Please select your relationship to this person.")
-        else:
-            with st.spinner("Reading the patterns..."):
-                features = extract_features(text_input)
-                result = predict(features, input_type=input_type)
+        if self_voice:
+            from src.voice import record_and_transcribe
+            with st.spinner("Listening... speak now (10 seconds)"):
+                vresult = record_and_transcribe(timeout=10, phrase_limit=30)
+            if vresult['success']:
+                st.session_state.self_voice_text = vresult['text']
+                st.session_state.self_input_key += 1
+                st.rerun()
+            else:
+                st.warning(vresult['error'])
+                st.session_state.self_voice_text = ""
 
+        if self_clear:
+            st.session_state.self_chat_history = []
+            st.session_state.self_full_text = ""
+            st.session_state.self_input_key += 1
+            st.session_state.self_voice_text = ""
+            st.session_state.obs_result = None
+            st.rerun()
+
+        if self_send and self_msg.strip():
+            st.session_state.self_voice_text = ""
+            # Accumulate full text for analysis
+            st.session_state.self_full_text += " " + self_msg
+
+            # Get conversational response
+            with st.spinner(""):
+                from src.conversation import get_response
+                result = get_response(
+                    history=st.session_state.self_chat_history,
+                    new_message=self_msg,
+                    stage=None
+                )
+
+            st.session_state.self_chat_history.append(
+                {'role': 'user', 'content': self_msg}
+            )
+            if result['success']:
+                st.session_state.self_chat_history.append(
+                    {'role': 'assistant', 'content': result['response']}
+                )
+            else:
+                st.session_state.self_chat_history.append(
+                    {'role': 'assistant',
+                     'content': "I hear you. Take your time — what else is on your mind?"}
+                )
+
+            st.session_state.self_input_key += 1
+            st.rerun()
+
+        # Optional analysis button
+        if st.session_state.self_full_text.strip():
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(
+                '<div style="font-size:12px; color:#9AAB9F; font-family:Georgia,serif;'
+                'font-style:italic;">When you are ready, Kairos can read the patterns in what you have shared.</div>',
+                unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Analyse what I have shared", use_container_width=True, key="self_analyse"):
+                with st.spinner("Reading the patterns..."):
+                    features = extract_features(st.session_state.self_full_text)
+                    result = predict(features, input_type='first_person')
+                st.session_state.obs_result = result
+                st.session_state.obs_context = {
+                    'person_id': 'self',
+                    'relationship': None,
+                    'input_type': 'first_person',
+                    'stage': result['stage'],
+                    'text': st.session_state.self_full_text
+                }
+                save_observation(
+                    person_id='self',
+                    text=st.session_state.self_full_text,
+                    stage=result['stage'],
+                    confidence=result['confidence'],
+                    probabilities=result['probabilities'],
+                    input_type='first_person'
+                )
+                st.rerun()
+
+        # Show analysis if available for self
+        if st.session_state.obs_result and st.session_state.obs_context and            st.session_state.obs_context.get('input_type') == 'first_person':
+
+            result = st.session_state.obs_result
             stage = result['stage']
             confidence = result['confidence']
             probs = result['probabilities']
             static_guidance = result['guidance']
-
-            save_observation(
-                person_id=person_id.strip(),
-                text=text_input,
-                stage=stage,
-                confidence=confidence,
-                probabilities=probs,
-                relationship=relationship,
-                input_type=input_type
-            )
-
-            # Store result in session state for follow-up
-            st.session_state.obs_result = result
-            st.session_state.obs_context = {
-                'person_id': person_id.strip(),
-                'relationship': relationship,
-                'input_type': input_type,
-                'stage': stage,
-                'text': text_input
-            }
-            st.session_state.obs_followup_history = []
-
-            trajectory = get_trajectory(person_id.strip())
+            features = extract_features(st.session_state.obs_context.get('text', ''))
 
             st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
 
@@ -408,9 +485,6 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-label">Signal distribution</div>',
-                unsafe_allow_html=True)
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Stress", f"{probs.get('stress', 0)*100:.0f}%")
@@ -419,71 +493,228 @@ with tab1:
             with col3:
                 st.metric("Crisis", f"{probs.get('crisis', 0)*100:.0f}%")
 
-            # SHAP explanation
             with st.expander("Why did Kairos read it this way?"):
                 try:
                     explanation = get_shap_explanation(features, stage)
                     img = plot_shap_bar(explanation, stage)
-                    st.markdown(
-                        '<div style="font-size:13px; color:#7A8C84; font-family:Georgia,serif;'
-                        'font-style:italic; margin-bottom:0.8rem; line-height:1.7;">'
-                        'These are the signals that most influenced the prediction. '
-                        'Colored bars pushed toward the detected stage. '
-                        'Grey bars pulled away from it.</div>',
-                        unsafe_allow_html=True
-                    )
                     st.image(img, use_container_width=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    top3 = explanation["top_features"][:3]
-                    for f in top3:
-                        label = f["label"]
-                        direction = "detected, pushing toward " + stage if f["shap_value"] > 0 else "not strongly present"
-                        st.markdown(
-                            f'<div style="font-size:12px; color:#5C6E65; margin-bottom:4px; font-family:Georgia,serif;">' +
-                            f'· <strong>{label}</strong> — {direction}</div>',
-                            unsafe_allow_html=True
-                        )
-                except Exception as e:
-                    st.markdown(
-                        '<div style="font-size:12px; color:#9AAB9F;">Explanation unavailable.</div>',
-                        unsafe_allow_html=True
-                    )
+                except:
+                    pass
 
-            if trajectory['has_trajectory']:
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<div class="section-label">Trajectory</div>',
-                    unsafe_allow_html=True)
-                trend = trajectory['trend']
-                trend_color = trajectory['trend_color']
-                n = trajectory['total_observations']
-                stages = trajectory['recent_stages']
-                trend_icons = {'worsening': '↗', 'improving': '↘', 'stable': '→'}
-                trend_labels = {
-                    'worsening': 'Signal is intensifying',
-                    'improving': 'Signal is easing',
-                    'stable': 'Signal is holding steady'
-                }
+            st.markdown('<div class="section-label">A few thoughts for you</div>',
+                unsafe_allow_html=True)
+
+            ollama_available = test_ollama_connection()
+            if ollama_available:
+                with st.spinner(""):
+                    ollama_result = generate_guidance(
+                        user_input=st.session_state.obs_context.get('text', ''),
+                        stage=stage,
+                        confidence=confidence,
+                        probabilities=probs,
+                        input_type='first_person',
+                        relationship=None,
+                        key_signals=features
+                    )
+                if ollama_result['success']:
+                    st.markdown('<div class="ollama-badge">✦ personalised guidance</div>',
+                        unsafe_allow_html=True)
+                    st.markdown("**Something that might help**")
+                    st.markdown(f'<div class="guidance-card">{ollama_result["what_to_say"]}</div>',
+                        unsafe_allow_html=True)
+                    st.markdown("**A gentle reminder**")
+                    st.markdown(f'<div class="avoid-card">{ollama_result["what_not_to_do"]}</div>',
+                        unsafe_allow_html=True)
+                else:
+                    st.markdown("**Something that might help**")
+                    st.markdown(f'<div class="guidance-card">{static_guidance["what_to_say"]}</div>',
+                        unsafe_allow_html=True)
+                    st.markdown("**A gentle reminder**")
+                    st.markdown(f'<div class="avoid-card">{static_guidance["what_not_to_do"]}</div>',
+                        unsafe_allow_html=True)
+
+            if stage == 'crisis' and confidence >= 0.65:
                 st.markdown(f"""
-                <div class="trajectory-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span style="font-size:13px; font-weight:600; color:{trend_color};">
-                                {trend_icons[trend]} {trend_labels[trend]}
-                            </span>
-                            <div style="font-size:12px; color:#7A8C84; margin-top:4px;">
-                                Based on {n} observation{'s' if n > 1 else ''}
-                            </div>
-                        </div>
-                        <div style="font-size:12px; color:#9AAB9F; text-align:right;">
-                            {' → '.join(stages)}
-                        </div>
+                <div class="crisis-card">
+                    <div style="font-size:14px; font-weight:600; color:#8B2E2E;
+                         margin-bottom:0.8rem;">You do not have to carry this alone.</div>
+                    <div style="font-size:13px; color:#6B3E3E; line-height:1.9;">
+                        What you are feeling is real. Please consider reaching out.<br><br>
+                        <strong>USA — 988 Lifeline:</strong> Call or text 988 (24/7)<br>
+                        <strong>USA — Crisis Text Line:</strong> Text HOME to 741741<br>
+                        <strong>India — iCall:</strong> 9152987821<br>
+                        <strong>India — Vandrevala Foundation:</strong> 1860-2662-345 (24/7)
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                if trajectory['stage_changed']:
-                    prev = trajectory['previous_stage']
-                    curr = trajectory['current_stage']
+        # Stop here for first_person mode — don't fall through to observer flow
+    # ── OBSERVER MODE ──
+    if input_type == "observer":
+        text_input = st.text_area(
+            label="input",
+            placeholder="Describe what you have observed in plain language. For example: She has not been eating properly. She laughed it off but sounded really flat.",
+            height=180,
+            label_visibility="collapsed",
+            key=f"obs_text_{input_type}_{st.session_state.obs_input_key}"
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.markdown('<div class="section-label">Your relationship to this person</div>',
+            unsafe_allow_html=True)
+        relationship = st.selectbox(
+            label="relationship",
+            options=["Select...", "Parent", "Child / Adult child",
+                     "Partner / Spouse", "Friend", "Sibling", "Colleague", "Other"],
+            label_visibility="collapsed",
+            key=f"obs_rel_{st.session_state.obs_input_key}"
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        analyse = st.button("Read the patterns", use_container_width=True, key="obs_btn")
+
+        if analyse:
+            if not text_input.strip():
+                st.warning("Please write something before continuing.")
+            elif not person_id.strip():
+                st.warning("Please enter a name or label for this person.")
+            elif relationship == "Select...":
+                st.warning("Please select your relationship to this person.")
+            else:
+                with st.spinner("Reading the patterns..."):
+                    features = extract_features(text_input)
+                    result = predict(features, input_type=input_type)
+
+                stage = result['stage']
+                confidence = result['confidence']
+                probs = result['probabilities']
+                static_guidance = result['guidance']
+
+                save_observation(
+                    person_id=person_id.strip(),
+                    text=text_input,
+                    stage=stage,
+                    confidence=confidence,
+                    probabilities=probs,
+                    relationship=relationship,
+                    input_type=input_type
+                )
+
+                # Increment key to clear text area next render
+                st.session_state.obs_input_key += 1
+
+                # Store result in session state for follow-up
+                st.session_state.obs_result = result
+                st.session_state.obs_context = {
+                    'person_id': person_id.strip(),
+                    'relationship': relationship,
+                    'input_type': input_type,
+                    'stage': stage,
+                    'text': text_input
+                }
+                st.session_state.obs_followup_history = []
+
+                trajectory = get_trajectory(person_id.strip())
+
+                st.markdown('<hr class="soft-divider">', unsafe_allow_html=True)
+
+                stage_colors = {
+                    'stress':     {'bg': '#FDF8F0', 'border': '#C9A87A', 'text': '#6B4F1E'},
+                    'depression': {'bg': '#F2F1FB', 'border': '#7B72D4', 'text': '#3B3280'},
+                    'crisis':     {'bg': '#FDF4F4', 'border': '#C97A7A', 'text': '#6B1E1E'},
+                }
+                c = stage_colors[stage]
+
+                st.markdown(f"""
+                <div class="stage-card" style="background:{c['bg']};
+                     border-left: 4px solid {c['border']};">
+                    <div style="font-size:13px; font-weight:600; letter-spacing:0.1em;
+                         text-transform:uppercase; color:{c['border']}; margin-bottom:0.5rem;">
+                        {static_guidance['label']}
+                    </div>
+                    <div style="font-size:15px; color:{c['text']}; font-family:Georgia,serif;">
+                        {static_guidance['description']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-label">Signal distribution</div>',
+                    unsafe_allow_html=True)
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Stress", f"{probs.get('stress', 0)*100:.0f}%")
+                with col2:
+                    st.metric("Depression", f"{probs.get('depression', 0)*100:.0f}%")
+                with col3:
+                    st.metric("Crisis", f"{probs.get('crisis', 0)*100:.0f}%")
+
+                # SHAP explanation
+                with st.expander("Why did Kairos read it this way?"):
+                    try:
+                        explanation = get_shap_explanation(features, stage)
+                        img = plot_shap_bar(explanation, stage)
+                        st.markdown(
+                            '<div style="font-size:13px; color:#7A8C84; font-family:Georgia,serif;'
+                            'font-style:italic; margin-bottom:0.8rem; line-height:1.7;">'
+                            'These are the signals that most influenced the prediction. '
+                            'Colored bars pushed toward the detected stage. '
+                            'Grey bars pulled away from it.</div>',
+                            unsafe_allow_html=True
+                        )
+                        st.image(img, use_container_width=True)
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        top3 = explanation["top_features"][:3]
+                        for f in top3:
+                            label = f["label"]
+                            direction = "detected, pushing toward " + stage if f["shap_value"] > 0 else "not strongly present"
+                            st.markdown(
+                                f'<div style="font-size:12px; color:#5C6E65; margin-bottom:4px; font-family:Georgia,serif;">' +
+                                f'· <strong>{label}</strong> — {direction}</div>',
+                                unsafe_allow_html=True
+                            )
+                    except Exception as e:
+                        st.markdown(
+                            '<div style="font-size:12px; color:#9AAB9F;">Explanation unavailable.</div>',
+                            unsafe_allow_html=True
+                        )
+
+                if trajectory['has_trajectory']:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown('<div class="section-label">Trajectory</div>',
+                        unsafe_allow_html=True)
+                    trend = trajectory['trend']
+                    trend_color = trajectory['trend_color']
+                    n = trajectory['total_observations']
+                    stages = trajectory['recent_stages']
+                    trend_icons = {'worsening': '↗', 'improving': '↘', 'stable': '→'}
+                    trend_labels = {
+                        'worsening': 'Signal is intensifying',
+                        'improving': 'Signal is easing',
+                        'stable': 'Signal is holding steady'
+                    }
+                    st.markdown(f"""
+                    <div class="trajectory-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <span style="font-size:13px; font-weight:600; color:{trend_color};">
+                                    {trend_icons[trend]} {trend_labels[trend]}
+                                </span>
+                                <div style="font-size:12px; color:#7A8C84; margin-top:4px;">
+                                    Based on {n} observation{'s' if n > 1 else ''}
+                                </div>
+                            </div>
+                            <div style="font-size:12px; color:#9AAB9F; text-align:right;">
+                                {' → '.join(stages)}
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                if trajectory.get('stage_changed', False):
+                    prev = trajectory.get('previous_stage', '')
+                    curr = trajectory.get('current_stage', '')
                     stage_order = ['stress', 'depression', 'crisis']
                     if stage_order.index(curr) > stage_order.index(prev):
                         st.markdown(f"""

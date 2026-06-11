@@ -2,6 +2,8 @@
 
 > *From the Greek — "the opportune moment." The right time to reach out, say the right thing, or simply be present.*
 
+> 📹 **[Watch the demo](assets/demo.gif)**
+
 ![Kairos Demo](assets/demo.gif)
 
 Kairos is a private, culturally-aware early warning system that helps people support someone they love who is silently burning out — without that person ever needing to ask for help.

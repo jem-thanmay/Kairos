@@ -2,6 +2,34 @@ import re
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+def correct_spelling(text: str) -> str:
+    """Fast spelling correction using common substitutions only."""
+    import re
+    # Common typo patterns - fast regex substitutions
+    corrections = {
+        r'\btierd\b': 'tired', r'\btierd\b': 'tired',
+        r'\bfeelig\b': 'feeling', r'\bfeelign\b': 'feeling',
+        r'\bdosent\b': 'doesn t', r'\bdoesnt\b': 'does not',
+        r'\bisnt\b': 'is not', r'\bwont\b': 'will not',
+        r'\bcant\b': 'cannot', r'\bdidnt\b': 'did not',
+        r'\bhavent\b': 'have not', r'\bhasnt\b': 'has not',
+        r'\bim\b': 'i am', r'\bive\b': 'i have',
+        r'\bdont\b': 'do not', r'\bcouldnt\b': 'could not',
+        r'\bwouldnt\b': 'would not', r'\bshouldnt\b': 'should not',
+        r'\bseeems\b': 'seems', r'\bseemss\b': 'seems',
+        r'\brealy\b': 'really', r'\breelly\b': 'really',
+        r'\balwasy\b': 'always', r'\bawlays\b': 'always',
+        r'\bexahsted\b': 'exhausted', r'\bexhausted\b': 'exhausted',
+        r'\bdepresed\b': 'depressed', r'\bdepressd\b': 'depressed',
+        r'\banxoius\b': 'anxious', r'\banxios\b': 'anxious',
+        r'\blonley\b': 'lonely', r'\blonley\b': 'lonely',
+        r'\bhopeles\b': 'hopeless', r'\bhopeles\b': 'hopeless',
+    }
+    text_lower = text.lower()
+    for pattern, replacement in corrections.items():
+        text_lower = re.sub(pattern, replacement, text_lower, flags=re.IGNORECASE)
+    return text_lower
+
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import nltk
 nltk.download('punkt', quiet=True)
@@ -88,8 +116,10 @@ def extract_features(text: str) -> dict:
 # Fix: normalize contractions before matching
 _original_extract = extract_features
 
-def extract_features(text: str) -> dict:
+def extract_features(text: str, correct: bool = True) -> dict:
     text = str(text)
+    if correct:
+        text = correct_spelling(text)
     text = text.replace("hasn't", "has not").replace("haven't", "have not")
     text = text.replace("doesn't", "does not").replace("don't", "do not")
     text = text.replace("didn't", "did not").replace("won't", "will not")

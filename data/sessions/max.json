@@ -1,0 +1,58 @@
+{
+  "person_id": "max",
+  "relationship": "Friend",
+  "observations": [
+    {
+      "timestamp": "2026-06-10T18:58:46.904398",
+      "date": "June 10, 2026",
+      "text": "max is feeling too anxoius of his future and is terrified of what it holds for him. he complains about how he has all this stress but doesnt know how to manage it",
+      "stage": "crisis",
+      "confidence": 0.536,
+      "probabilities": {
+        "crisis": 0.536,
+        "depression": 0.305,
+        "stress": 0.159
+      },
+      "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-10T19:00:38.013470",
+      "date": "June 10, 2026",
+      "text": "max says he has too much on his plate and too much work and school and he is overwhelmed. doesnt have the time to eat or rest or even play. what do i do to make him feel better",
+      "stage": "stress",
+      "confidence": 0.69,
+      "probabilities": {
+        "crisis": 0.228,
+        "depression": 0.081,
+        "stress": 0.69
+      },
+      "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-10T19:06:23.627035",
+      "date": "June 10, 2026",
+      "text": "max is feeling the same away still. nothing to seems to work for him.",
+      "stage": "stress",
+      "confidence": 0.683,
+      "probabilities": {
+        "crisis": 0.11,
+        "depression": 0.207,
+        "stress": 0.683
+      },
+      "input_type": "observer"
+    },
+    {
+      "timestamp": "2026-06-10T19:08:21.103767",
+      "date": "June 10, 2026",
+      "text": "max is still feeling the same. how can i help, i cant see him in so much stress anymore",
+      "stage": "crisis",
+      "confidence": 0.596,
+      "probabilities": {
+        "crisis": 0.596,
+        "depression": 0.276,
+        "stress": 0.128
+      },
+      "input_type": "observer"
+    }
+  ]
+}

@@ -42,6 +42,12 @@ def get_response(
     new_message: str,
     stage: str = None
 ) -> Dict:
+    # Correct spelling
+    try:
+        from src.features import correct_spelling
+        new_message = correct_spelling(new_message)
+    except:
+        pass
 
     prompt = build_conversation_prompt(history, new_message, stage)
 
@@ -55,8 +61,8 @@ def get_response(
                 "options": {
                     "temperature": 0.7,
                     "top_p": 0.9,
-                    "num_predict": 150,
-                    "stop": ["Person:", "Human:", "\n\n"]
+                    "num_predict": 250,
+                    "stop": ["Person:", "Human:"]
                 }
             },
             timeout=60
